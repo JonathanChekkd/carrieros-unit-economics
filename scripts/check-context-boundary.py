@@ -23,6 +23,13 @@ def main():
             try: p.resolve().relative_to(ROOT)
             except ValueError: failures.append(relative); continue
         if not p.is_file(): continue
+        try:
+            with p.open('rb') as stream: header=stream.read(16)
+        except OSError:
+            failures.append(relative); continue
+        # Git bundles can conceal arbitrary history; imports require review in their owning repository.
+        if p.suffix.lower()=='.bundle' or header.startswith((b'# v2 git bundle',b'# v3 git bundle')):
+            failures.append(relative); continue
         if p.suffix.lower() in {'.zip','.docx','.xlsx','.pptx'}:
             try:
                 with zipfile.ZipFile(p) as archive:
@@ -33,7 +40,7 @@ def main():
         if p.suffix.lower() in {'.md','.txt','.json','.jsonl','.yaml','.yml','.html','.svg','.py','.js','.ts','.mjs'}:
             if restricted(p.read_text(encoding='utf-8',errors='replace')): failures.append(relative)
     if failures:
-        print('FAIL: restricted source references found in ' + ', '.join(failures))
+        print('FAIL: restricted references or opaque imports found in ' + ', '.join(failures))
         return 1
     print('PASS: no forbidden restricted-source locators in tracked text; manual design-content review is still required')
     return 0
